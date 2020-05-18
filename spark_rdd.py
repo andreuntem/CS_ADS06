@@ -70,6 +70,14 @@ def get_min_max_timestamps(dataset):
     return (min_date, max_date)
 
 
+def get_bucket(rec, min_timestamp, max_timestamp):
+    min_timestamp = datetime.datetime.timestamp(min_timestamp)
+    max_timestamp = datetime.datetime.timestamp(max_timestamp)
+    interval = (max_timestamp - min_timestamp + 1) / 200.0
+    rec['bucket'] = int((rec["created_at_i"] - min_timestamp) / interval)
+    return rec
+
+
 def get_number_of_posts_per_bucket(dataset, min_time, max_time):
     """
     Using the `get_bucket` function defined in the notebook (redefine it in this file), this function should return a
@@ -80,9 +88,10 @@ def get_number_of_posts_per_bucket(dataset, min_time, max_time):
     :param max_time: Maximum time to consider for buckets (datetime format)
     :return: an RDD with number of elements per bucket
     """
-    def convert_str_to_datetime(x):
-        return datetime.datetime.strptime(x, '%Y-%m-%dT%H:%M:%SZ')
-    return dataset.filter(lambda x: min_time <= convert_str_to_datetime(x['created_at']) <= max_time)
+    A = dataset.map(lambda x: get_bucket(x, min_time, max_time))
+    B = A.map(lambda x: (x['bucket'], 1))
+    out = B.reduceByKey(lambda x, y: x+y)
+    return out
 
 
 def get_hour(x):
@@ -137,7 +146,7 @@ def get_proportion_of_scores(dataset):
 
 def get_words(x):
     line = x['title']
-    adj_title = re.compile('\w+').findall(line)
+    adj_title = re.compile(r'\w+').findall(line)
     x['len_title'] = len(adj_title)
     return x
 
